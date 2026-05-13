@@ -1,9 +1,12 @@
-# Never commit these
+# ── NEVER commit these ───────────────────────────────────────────
 .secrets_cache.json
 *.pyc
 __pycache__/
 .env
 .env.*
 
-# docs/ is committed by the bot after build
-# (same pattern as blog_system.py project)
+# docs/ contains chat.js which has a live API token baked in.
+# It must NEVER be committed — GitHub push protection will block it.
+# docs/ is built by Actions on the runner and uploaded directly to
+# GitHub Pages as an artifact. It never touches the git repo.
+docs/
