@@ -5,8 +5,16 @@ __pycache__/
 .env
 .env.*
 
-# docs/ contains chat.js which has a live API token baked in.
-# It must NEVER be committed — GitHub push protection will block it.
-# docs/ is built by Actions on the runner and uploaded directly to
-# GitHub Pages as an artifact. It never touches the git repo.
+# Both of these contain chat.js with a live API token baked in.
+# They must NEVER be committed — GitHub push protection will block it.
+#
+# How the build works:
+#   Local dev  → python chatbot_system.py build  → writes to docs/
+#   CI/Actions → BUILD_OUTPUT_DIR=_site python … → writes to _site/
+#
+# _site/ is used in CI because upload-pages-artifact@v3 internally runs
+# `git add` on the upload path — which exits 1 if the path is gitignored.
+# So CI builds to _site/ (not gitignored at git-add time, just here for
+# local safety) and uploads that. docs/ stays gitignored always.
 docs/
+_site/

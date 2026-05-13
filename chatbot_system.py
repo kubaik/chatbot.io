@@ -36,7 +36,10 @@ log = logging.getLogger(__name__)
 #  PATHS
 # ─────────────────────────────────────────────
 ROOT = Path(__file__).parent
-DOCS_DIR = ROOT / "docs"
+# BUILD_OUTPUT_DIR env var lets the workflow redirect output to _site/
+# (which is not gitignored) so upload-pages-artifact doesn't hit the
+# .gitignore block that protects docs/ from accidental token commits.
+DOCS_DIR = ROOT / os.getenv("BUILD_OUTPUT_DIR", "docs")
 STATIC_DIR = ROOT / "static"
 CONFIG_FILE = ROOT / "config.yaml"
 SECRETS_FILE = ROOT / ".secrets_cache.json"   # never committed (in .gitignore)

@@ -18,7 +18,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents: write
+  contents: read # read-only — we never push docs/ back to the repo
   pages: write
   id-token: write
 
@@ -55,15 +55,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 3. Pull latest (same robust fetch+reset pattern) ─────────
-      - name: Pull latest changes
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name  "github-actions[bot]"
-          git fetch origin main
-          git reset --hard origin/main
-
-      # ── 4. Verify secrets (same pattern as blog verify step) ─────
+      # ── 3. Verify secrets ────────────────────────────────────────
       #  Logs OK/WARNING for every possible provider key.
       #  chatbot_system.py verify picks the first available one.
       - name: Verify secrets
@@ -97,12 +89,18 @@ jobs:
             || python chatbot_system.py init
 
       # ── 6. Build static site ─────────────────────────────────────
-      #  Python reads config.yaml + env secrets → writes docs/
-      #  Token is injected into chat.js here — never touches source.
+      #  BUILD_OUTPUT_DIR=_site tells chatbot_system.py to write to
+      #  _site/ instead of docs/. _site/ is NOT in .gitignore so
+      #  actions/upload-pages-artifact won't hit the gitignore block.
+      #
+      #  Why not docs/?  docs/ is in .gitignore (to prevent the token
+      #  ever being committed). But upload-pages-artifact@v3 internally
+      #  runs `git add` on the upload path, which fails with exit 1 when
+      #  the path is gitignored. Using _site/ sidesteps this entirely.
       - name: Build chatbot
         env:
-          # All providers passed in — Python picks the first available
-          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+          BUILD_OUTPUT_DIR: _site
+          GITHUB_TOKEN_PAT: ${{ secrets.GITHUB_TOKEN_PAT }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -115,50 +113,33 @@ jobs:
             python chatbot_system.py build
           }
 
-      # ── 7. Verify output (mirrors blog verify step) ──────────────
+      # ── 7. Verify output ─────────────────────────────────────────
       - name: Verify generated content
         run: |
-          [ -f "docs/index.html" ]            || { echo "ERROR: no index.html";   exit 1; }
-          [ -f "docs/static/js/chat.js" ]     || { echo "ERROR: no chat.js";      exit 1; }
-          [ -f "docs/static/css/chat.css" ]   || { echo "ERROR: no chat.css";     exit 1; }
+          [ -f "_site/index.html" ]            || { echo "ERROR: no index.html";  exit 1; }
+          [ -f "_site/static/js/chat.js" ]     || { echo "ERROR: no chat.js";     exit 1; }
+          [ -f "_site/static/css/chat.css" ]   || { echo "ERROR: no chat.css";    exit 1; }
           echo "✅ All output files present"
-          echo "index.html:  $(wc -c < docs/index.html) bytes"
-          echo "chat.js:     $(wc -c < docs/static/js/chat.js) bytes"
-          echo "chat.css:    $(wc -c < docs/static/css/chat.css) bytes"
+          echo "index.html : $(wc -c < _site/index.html) bytes"
+          echo "chat.js    : $(wc -c < _site/static/js/chat.js) bytes"
+          echo "chat.css   : $(wc -c < _site/static/css/chat.css) bytes"
 
-      # ── 8. Commit built docs back to repo ────────────────────────
-      #  Same retry-on-collision pattern as blog workflow.
-      - name: Commit and push with retry
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name  "github-actions[bot]"
-          git add docs/
-          if git diff --staged --quiet; then
-            echo "Nothing new to commit"
-          else
-            git commit -m "Auto-build chatbot $(date '+%Y-%m-%d %H:%M UTC')"
-            git push origin main || {
-              echo "Push failed — pulling and retrying..."
-              git fetch origin main
-              git rebase origin/main
-              git push origin main
-            }
-          fi
-
-      # ── 9. Deploy to GitHub Pages ─────────────────────────────────
+      # ── 8. Deploy to GitHub Pages ─────────────────────────────────
+      # _site/ is built on the runner only — never committed to git.
+      # upload-pages-artifact tarballs it and ships it straight to Pages.
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs
+          path: ./_site
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # ── 10. Summary (same format as blog workflow) ────────────────
+      # ── 9. Summary ───────────────────────────────────────────────
       - name: Summary
         run: |
           {
@@ -170,16 +151,16 @@ jobs:
             echo "### Files"
             echo "| File | Size |"
             echo "|---|---|"
-            echo "| index.html | $(wc -c < docs/index.html) bytes |"
-            echo "| chat.js | $(wc -c < docs/static/js/chat.js) bytes |"
-            echo "| chat.css | $(wc -c < docs/static/css/chat.css) bytes |"
+            echo "| index.html | $(wc -c < _site/index.html) bytes |"
+            echo "| chat.js    | $(wc -c < _site/static/js/chat.js) bytes |"
+            echo "| chat.css   | $(wc -c < _site/static/css/chat.css) bytes |"
             echo ""
             echo "### Provider"
             python -c "
           import json, pathlib
-          cfg = json.loads(pathlib.Path('docs/config.json').read_text())
+          cfg = json.loads(pathlib.Path('_site/config.json').read_text())
           p = cfg.get('provider', {})
-          print(f\"| Name | {p.get('name','?')} |\")
+          print(f\"| Name  | {p.get('name','?')} |\")
           print(f\"| Model | {p.get('model','?')} |\")
             "
           } >> $GITHUB_STEP_SUMMARY
