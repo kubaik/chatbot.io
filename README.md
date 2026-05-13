@@ -102,7 +102,6 @@ pip install -r requirements.txt
 python chatbot_system.py init
 
 # Build (uses any keys set in your shell environment)
-export GROQ_API_KEY=gsk_...
 python chatbot_system.py build
 
 # Verify output
