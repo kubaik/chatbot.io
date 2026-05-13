@@ -77,17 +77,17 @@ DEFAULT_CONFIG = {
         # Only Mistral and GitHub Models are supported.
         "providers": [
             {
-                "name":        "mistral",
-                "env_key":     "MISTRAL_API_KEY",
-                "endpoint":    "https://api.mistral.ai/v1/chat/completions",
-                "model":       "mistral-small-latest",
-                "auth_header": "Bearer",
-            },
-            {
                 "name":        "github",
                 "env_key":     "GIT_TOKEN",
                 "endpoint":    "https://models.github.ai/inference/chat/completions",
                 "model":       "gpt-4o",
+                "auth_header": "Bearer",
+            },
+            {
+                "name":        "mistral",
+                "env_key":     "MISTRAL_API_KEY",
+                "endpoint":    "https://api.mistral.ai/v1/chat/completions",
+                "model":       "mistral-small-latest",
                 "auth_header": "Bearer",
             },
         ]
