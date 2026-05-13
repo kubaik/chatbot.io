@@ -1,0 +1,9 @@
+# Never commit these
+.secrets_cache.json
+*.pyc
+__pycache__/
+.env
+.env.*
+
+# docs/ is committed by the bot after build
+# (same pattern as blog_system.py project)

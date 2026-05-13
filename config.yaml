@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────
+#  chatbot config.yaml  — edit this file to customise the bot
+#  Secrets (API keys) live in GitHub Secrets, NOT here.
+# ─────────────────────────────────────────────────────────
+
+bot:
+  name: "LocalBiz Assistant"
+  icon: "🤖"
+  greeting: "Hi! 👋 How can I help you today?"
+  system_prompt: >
+    You are a friendly assistant for LocalBiz.
+    Help customers with opening hours, services, pricing, and bookings.
+    Be concise and warm. If unsure, ask the customer to call us directly.
+  quick_replies:
+    - "Opening hours"
+    - "Book appointment"
+    - "Pricing"
+    - "Location"
+
+theme:
+  primary_color: "#1a1a2e"
+  accent_color: "#e94560"
+
+models:
+  # Priority order — first provider whose env key is set wins.
+  # Keys are read from GitHub Secrets at build time.
+  providers:
+    - name: github
+      env_key: GITHUB_TOKEN_PAT
+      endpoint: "https://models.github.ai/inference/chat/completions"
+      model: "gpt-4o"
+      auth_header: Bearer
+
+    - name: groq
+      env_key: GROQ_API_KEY
+      endpoint: "https://api.groq.com/openai/v1/chat/completions"
+      model: "llama3-8b-8192"
+      auth_header: Bearer
+
+    - name: openrouter
+      env_key: OPENROUTER_API_KEY
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      model: "mistralai/mistral-7b-instruct"
+      auth_header: Bearer
+
+    - name: mistral
+      env_key: MISTRAL_API_KEY
+      endpoint: "https://api.mistral.ai/v1/chat/completions"
+      model: "mistral-small-latest"
+      auth_header: Bearer
+
+    - name: cerebras
+      env_key: CEREBRAS_API_KEY
+      endpoint: "https://api.cerebras.ai/v1/chat/completions"
+      model: "llama3.1-8b"
+      auth_header: Bearer
+
+    - name: gemini
+      env_key: GEMINI_API_KEY
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      model: "gemini-2.0-flash"
+      auth_header: Bearer
+
+    - name: nvidia
+      env_key: NVIDIA_API_KEY
+      endpoint: "https://integrate.api.nvidia.com/v1/chat/completions"
+      model: "meta/llama-3.1-8b-instruct"
+      auth_header: Bearer
+
+deploy:
+  output_dir: "docs"
