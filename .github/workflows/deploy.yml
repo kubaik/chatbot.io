@@ -3,8 +3,8 @@ name: AI Chatbot — Build & Deploy
 # ── Same trigger pattern as your blog workflow ──────────────────
 on:
   schedule:
-    - cron: "0 * * * *"       # hourly (keeps Pages fresh; remove if not needed)
-  workflow_dispatch:            # manual trigger from Actions UI
+    - cron: "0 * * * *" # hourly (keeps Pages fresh; remove if not needed)
+  workflow_dispatch: # manual trigger from Actions UI
     inputs:
       force_rebuild:
         description: "Force full rebuild even if no changes"
@@ -19,7 +19,7 @@ env:
 
 permissions:
   contents: write
-  pages:    write
+  pages: write
   id-token: write
 
 # ── Prevents stacked runs colliding on git push (same fix as blog) ──
@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: github-pages
-      url:  ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────
@@ -68,7 +68,7 @@ jobs:
       #  chatbot_system.py verify picks the first available one.
       - name: Verify secrets
         run: |
-          for VAR in GITHUB_TOKEN_PAT \
+          for VAR in GIT_TOKEN \
                      GROQ_API_KEY \
                      GEMINI_API_KEY \
                      OPENROUTER_API_KEY \
@@ -82,13 +82,13 @@ jobs:
             fi
           done
         env:
-          GITHUB_TOKEN_PAT:    ${{ secrets.GITHUB_TOKEN_PAT }}
-          GROQ_API_KEY:        ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY:      ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
-          CEREBRAS_API_KEY:    ${{ secrets.CEREBRAS_API_KEY }}
-          MISTRAL_API_KEY:     ${{ secrets.MISTRAL_API_KEY }}
-          NVIDIA_API_KEY:      ${{ secrets.NVIDIA_API_KEY }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
 
       # ── 5. Init config if missing ────────────────────────────────
       - name: Initialize config if needed
@@ -102,13 +102,13 @@ jobs:
       - name: Build chatbot
         env:
           # All providers passed in — Python picks the first available
-          GITHUB_TOKEN_PAT:    ${{ secrets.GITHUB_TOKEN_PAT }}
-          GROQ_API_KEY:        ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY:      ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
-          CEREBRAS_API_KEY:    ${{ secrets.CEREBRAS_API_KEY }}
-          MISTRAL_API_KEY:     ${{ secrets.MISTRAL_API_KEY }}
-          NVIDIA_API_KEY:      ${{ secrets.NVIDIA_API_KEY }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           python chatbot_system.py auto || {
             echo "WARNING: auto failed — falling back to build"

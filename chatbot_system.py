@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
         "providers": [
             {
                 "name":    "github",
-                "env_key": "GITHUB_TOKEN_PAT",
+                "env_key": "GIT_TOKEN",
                 "endpoint": "https://models.github.ai/inference/chat/completions",
                 "model":   "gpt-4o",
                 "auth_header": "Bearer",
