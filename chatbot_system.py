@@ -8,6 +8,10 @@ Usage:
     python chatbot_system.py build      # Build static site into docs/
     python chatbot_system.py auto       # Full pipeline: validate → build → deploy-ready
     python chatbot_system.py verify     # Check secrets and config only
+
+Providers (priority order):
+    1. Mistral  — set MISTRAL_API_KEY
+    2. GitHub   — set GIT_TOKEN
 """
 
 import os
@@ -69,55 +73,21 @@ DEFAULT_CONFIG = {
         "accent_color":  "#e94560",
     },
     "models": {
-        # Priority order — first available key wins
+        # Priority order — first available key wins.
+        # Only Mistral and GitHub Models are supported.
         "providers": [
             {
-                "name":    "github",
-                "env_key": "GIT_TOKEN",
-                "endpoint": "https://models.github.ai/inference/chat/completions",
-                "model":   "gpt-4o",
+                "name":        "mistral",
+                "env_key":     "MISTRAL_API_KEY",
+                "endpoint":    "https://api.mistral.ai/v1/chat/completions",
+                "model":       "mistral-small-latest",
                 "auth_header": "Bearer",
             },
             {
-                "name":    "groq",
-                "env_key": "GROQ_API_KEY",
-                "endpoint": "https://api.groq.com/openai/v1/chat/completions",
-                "model":   "llama3-8b-8192",
-                "auth_header": "Bearer",
-            },
-            {
-                "name":    "openrouter",
-                "env_key": "OPENROUTER_API_KEY",
-                "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-                "model":   "mistralai/mistral-7b-instruct",
-                "auth_header": "Bearer",
-            },
-            {
-                "name":    "mistral",
-                "env_key": "MISTRAL_API_KEY",
-                "endpoint": "https://api.mistral.ai/v1/chat/completions",
-                "model":   "mistral-small-latest",
-                "auth_header": "Bearer",
-            },
-            {
-                "name":    "cerebras",
-                "env_key": "CEREBRAS_API_KEY",
-                "endpoint": "https://api.cerebras.ai/v1/chat/completions",
-                "model":   "llama3.1-8b",
-                "auth_header": "Bearer",
-            },
-            {
-                "name":    "gemini",
-                "env_key": "GEMINI_API_KEY",
-                "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                "model":   "gemini-2.0-flash",
-                "auth_header": "Bearer",
-            },
-            {
-                "name":    "nvidia",
-                "env_key": "NVIDIA_API_KEY",
-                "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
-                "model":   "meta/llama-3.1-8b-instruct",
+                "name":        "github",
+                "env_key":     "GIT_TOKEN",
+                "endpoint":    "https://models.github.ai/inference/chat/completions",
+                "model":       "mistral-ai/Mistral-small",   # GitHub Models – Mistral-hosted
                 "auth_header": "Bearer",
             },
         ]
@@ -141,6 +111,8 @@ def cmd_init():
         yaml.dump(DEFAULT_CONFIG, f, default_flow_style=False,
                   allow_unicode=True, sort_keys=False)
     log.info("✅ config.yaml created — edit to customise your chatbot")
+    log.info(
+        "   Set MISTRAL_API_KEY or GIT_TOKEN in your environment / GitHub Secrets")
 
 
 # ─────────────────────────────────────────────
@@ -168,6 +140,9 @@ def cmd_verify():
 
     if not found:
         log.error("No API keys found — chatbot will run in demo mode")
+        log.error("  Set MISTRAL_API_KEY  for Mistral AI (primary)")
+        log.error(
+            "  Set GIT_TOKEN        for GitHub Models / Mistral-small (fallback)")
         return None
 
     winner = found[0]
@@ -359,9 +334,11 @@ code{{font-size:11px;background:#f3f4f6;padding:1px 4px;border-radius:4px}}
 
 def write_js(cfg: dict, provider: dict | None, token: str):
     """
-    Write chat.js — token is baked in at build time (same sed pattern
-    as before, but now done in Python instead of shell).
-    The JS file is self-contained; index.html just loads it.
+    Write chat.js — token is baked in at build time.
+    Supports two providers: Mistral (primary) and GitHub Models (fallback).
+    GitHub Models uses the same OpenAI-compatible /chat/completions schema.
+    Mistral's API is also OpenAI-compatible, so a single callAI() path works
+    for both; the only difference is the Authorization header value and endpoint.
     """
     bot = cfg["bot"]
     quick_json = json.dumps(bot["quick_replies"], ensure_ascii=False)
@@ -373,8 +350,8 @@ def write_js(cfg: dict, provider: dict | None, token: str):
     endpoint = provider["endpoint"] if provider else ""
     model_id = provider["model"] if provider else "demo"
     provider_name = provider["name"] if provider else "demo"
+    auth_header = provider["auth_header"] if provider else "Bearer"
 
-    # Token is written literally — no placeholder needed (Python does the injection)
     safe_token = token.replace("`", "\\`").replace(
         "\\", "\\\\") if token else ""
 
@@ -385,6 +362,8 @@ const CHATBOT_TOKEN    = `{safe_token}`;
 const CHATBOT_ENDPOINT = `{endpoint}`;
 const CHATBOT_MODEL    = `{model_id}`;
 const CHATBOT_PROVIDER = `{provider_name}`;
+// Authorization scheme — both Mistral and GitHub Models use "Bearer"
+const CHATBOT_AUTH_HDR = `{auth_header}`;
 
 /* Runtime config (overridable via Settings panel) */
 let CFG = {{
@@ -429,10 +408,13 @@ function renderProviderStrip() {{
   if (!strip) return;
   if (!CHATBOT_TOKEN || CHATBOT_PROVIDER === "demo") {{
     strip.className = "demo";
-    strip.innerHTML = `⚠️ Demo mode — no API key injected. Push with secrets set to enable live AI.`;
+    strip.innerHTML = `⚠️ Demo mode — no API key found. Set MISTRAL_API_KEY or GIT_TOKEN to enable live AI.`;
+  }} else if (CHATBOT_PROVIDER === "mistral") {{
+    strip.className = "";
+    strip.innerHTML = `✅ Live AI &nbsp;·&nbsp; <strong>Mistral AI</strong> &nbsp;·&nbsp; ${{CHATBOT_MODEL}}`;
   }} else {{
     strip.className = "";
-    strip.innerHTML = `✅ Live AI &nbsp;·&nbsp; <strong>${{CHATBOT_PROVIDER}}</strong> &nbsp;·&nbsp; ${{CHATBOT_MODEL}}`;
+    strip.innerHTML = `✅ Live AI &nbsp;·&nbsp; <strong>GitHub Models</strong> (Mistral) &nbsp;·&nbsp; ${{CHATBOT_MODEL}}`;
   }}
 }}
 
@@ -504,9 +486,13 @@ async function send(override) {{
   busy = false;
 }}
 
-/* ── API CALL ── */
+/* ── API CALL ──────────────────────────────────────────────────────────────
+   Both Mistral AI and GitHub Models expose an OpenAI-compatible
+   /v1/chat/completions endpoint, so a single fetch() path handles both.
+   The endpoint URL, model name, and Bearer token are baked in at build time.
+   ────────────────────────────────────────────────────────────────────────── */
 async function callAI() {{
-  /* Demo fallback */
+  /* Demo fallback — no token available */
   if (!CHATBOT_TOKEN || CHATBOT_PROVIDER === "demo") {{
     return demoReply(history[history.length-1]?.content || "");
   }}
@@ -520,7 +506,7 @@ async function callAI() {{
     method: "POST",
     headers: {{
       "Content-Type":  "application/json",
-      "Authorization": `Bearer ${{CHATBOT_TOKEN}}`
+      "Authorization": `${{CHATBOT_AUTH_HDR}} ${{CHATBOT_TOKEN}}`
     }},
     body: JSON.stringify({{
       model:       CHATBOT_MODEL,
@@ -536,6 +522,7 @@ async function callAI() {{
   }}
 
   const data = await res.json();
+  // Both Mistral and GitHub Models follow OpenAI's choices[].message.content shape
   return data.choices?.[0]?.message?.content?.trim()
     || "Sorry, I received an empty response.";
 }}
@@ -551,7 +538,7 @@ function demoReply(text) {{
   }};
   for (const [k,v] of Object.entries(map)) if (t.includes(k)) return v;
   return "I'm in demo mode — no API key was injected at build time. " +
-    "Set your secrets in GitHub and push to enable live AI.";
+    "Set MISTRAL_API_KEY (primary) or GIT_TOKEN (fallback) to enable live AI.";
 }}
 
 /* ── SETTINGS PANEL ── */
@@ -601,6 +588,7 @@ def write_html(cfg: dict, provider: dict | None):
     name = bot["name"]
     icon = bot["icon"]
     model = provider["model"] if provider else "demo"
+    provider_name = provider["name"] if provider else "demo"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -688,8 +676,9 @@ def write_html(cfg: dict, provider: dict | None):
     <label class="config-label">Active Provider</label>
     <p class="info-note">
       Provider and model are set at <strong>build time</strong> via GitHub Secrets.<br>
-      Active: <code>{provider["name"] if provider else "demo"}</code>
-      &nbsp;→&nbsp; <code>{model}</code>
+      Active: <code>{provider_name}</code>
+      &nbsp;→&nbsp; <code>{model}</code><br><br>
+      Priority: <code>MISTRAL_API_KEY</code> → <code>GIT_TOKEN</code>
     </p>
   </div>
 
