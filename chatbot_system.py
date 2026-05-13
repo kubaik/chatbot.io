@@ -87,7 +87,7 @@ DEFAULT_CONFIG = {
                 "name":        "github",
                 "env_key":     "GIT_TOKEN",
                 "endpoint":    "https://models.github.ai/inference/chat/completions",
-                "model":       "mistral-ai/Mistral-small",   # GitHub Models – Mistral-hosted
+                "model":       "gpt-4o",
                 "auth_header": "Bearer",
             },
         ]
