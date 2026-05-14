@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-chatbot_system.py — White-label AI Chatbot Builder
-Mirrors the blog_system.py pattern: init / build / auto commands.
-
-Usage:
-    python chatbot_system.py init       # Create config.yaml from defaults
-    python chatbot_system.py build      # Build static site into docs/
-    python chatbot_system.py auto       # Full pipeline: validate → build → deploy-ready
-    python chatbot_system.py verify     # Check secrets and config only
-
-Providers (priority order):
-    1. Mistral  — set MISTRAL_API_KEY
-    2. GitHub   — set GIT_TOKEN
-"""
 
 import os
 import sys
