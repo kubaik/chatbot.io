@@ -8,7 +8,7 @@ A white-label AI chatbot builder that mirrors your `blog_system.py` project stru
 ## 📁 Project Structure
 
 ```
-kubaik.github.chatbot.io/
+chatbot.io/
 ├── chatbot_system.py          ← Main builder (init / build / auto / verify)
 ├── config.yaml                ← Client config — name, colours, prompt, quick replies
 ├── requirements.txt           ← pyyaml

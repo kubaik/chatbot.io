@@ -1,13 +1,12 @@
-name: AI Chatbot — Build & Deploy
+name: Java Restaurant Chatbot — Build & Deploy
 
-# ── Same trigger pattern as your blog workflow ──────────────────
 on:
   schedule:
-    - cron: "0 * * * *" # hourly (keeps Pages fresh; remove if not needed)
-  workflow_dispatch: # manual trigger from Actions UI
+    - cron: "0 6 * * *" # daily 6 AM rebuild keeps Pages fresh
+  workflow_dispatch:
     inputs:
       force_rebuild:
-        description: "Force full rebuild even if no changes"
+        description: "Force full rebuild"
         required: false
         default: false
         type: boolean
@@ -18,11 +17,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents: read # read-only — we never push docs/ back to the repo
+  contents: read # read-only — _site/ is never committed back to git
   pages: write
   id-token: write
 
-# ── Prevents stacked runs colliding on git push (same fix as blog) ──
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -43,7 +41,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # ── 2. Python setup (mirrors blog workflow exactly) ──────────
+      # ── 2. Python setup ──────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -56,77 +54,56 @@ jobs:
           pip install -r requirements.txt
 
       # ── 3. Verify secrets ────────────────────────────────────────
-      #  Logs OK/WARNING for every possible provider key.
-      #  chatbot_system.py verify picks the first available one.
+      # GIT_TOKEN  = GitHub Models (primary, uses gpt-4o)
+      # MISTRAL_API_KEY = Mistral AI (fallback)
       - name: Verify secrets
         run: |
-          for VAR in GIT_TOKEN \
-                     GROQ_API_KEY \
-                     GEMINI_API_KEY \
-                     OPENROUTER_API_KEY \
-                     CEREBRAS_API_KEY \
-                     MISTRAL_API_KEY \
-                     NVIDIA_API_KEY; do
+          for VAR in GIT_TOKEN MISTRAL_API_KEY; do
             if [ -z "${!VAR}" ]; then
               echo "WARNING: $VAR is not set"
             else
               echo "OK: $VAR is set"
             fi
           done
+          if [ -z "$GIT_TOKEN" ] && [ -z "$MISTRAL_API_KEY" ]; then
+            echo "WARNING: No API keys set — chatbot will run in demo mode"
+          fi
         env:
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
 
-      # ── 5. Init config if missing ────────────────────────────────
+      # ── 4. Init config if missing ────────────────────────────────
       - name: Initialize config if needed
         run: |
           [ -f "config.yaml" ] && echo "config.yaml exists" \
             || python chatbot_system.py init
 
-      # ── 6. Build static site ─────────────────────────────────────
-      #  BUILD_OUTPUT_DIR=_site tells chatbot_system.py to write to
-      #  _site/ instead of docs/. _site/ is NOT in .gitignore so
-      #  actions/upload-pages-artifact won't hit the gitignore block.
-      #
-      #  Why not docs/?  docs/ is in .gitignore (to prevent the token
-      #  ever being committed). But upload-pages-artifact@v3 internally
-      #  runs `git add` on the upload path, which fails with exit 1 when
-      #  the path is gitignored. Using _site/ sidesteps this entirely.
+      # ── 5. Build ─────────────────────────────────────────────────
+      # BUILD_OUTPUT_DIR=_site avoids the gitignore/upload-pages-artifact
+      # conflict — _site/ is built fresh on the runner and never committed.
       - name: Build chatbot
         env:
           BUILD_OUTPUT_DIR: _site
-          GITHUB_TOKEN_PAT: ${{ secrets.GITHUB_TOKEN_PAT }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           python chatbot_system.py auto || {
-            echo "WARNING: auto failed — falling back to build"
+            echo "WARNING: auto failed — falling back to build only"
             python chatbot_system.py build
           }
 
-      # ── 7. Verify output ─────────────────────────────────────────
+      # ── 6. Verify output ─────────────────────────────────────────
       - name: Verify generated content
         run: |
-          [ -f "_site/index.html" ]            || { echo "ERROR: no index.html";  exit 1; }
-          [ -f "_site/static/js/chat.js" ]     || { echo "ERROR: no chat.js";     exit 1; }
-          [ -f "_site/static/css/chat.css" ]   || { echo "ERROR: no chat.css";    exit 1; }
+          [ -f "_site/index.html" ]          || { echo "ERROR: no index.html"; exit 1; }
+          [ -f "_site/static/js/chat.js" ]   || { echo "ERROR: no chat.js";    exit 1; }
+          [ -f "_site/static/css/chat.css" ] || { echo "ERROR: no chat.css";   exit 1; }
           echo "✅ All output files present"
           echo "index.html : $(wc -c < _site/index.html) bytes"
           echo "chat.js    : $(wc -c < _site/static/js/chat.js) bytes"
           echo "chat.css   : $(wc -c < _site/static/css/chat.css) bytes"
 
-      # ── 8. Deploy to GitHub Pages ─────────────────────────────────
-      # _site/ is built on the runner only — never committed to git.
-      # upload-pages-artifact tarballs it and ships it straight to Pages.
+      # ── 7. Deploy ────────────────────────────────────────────────
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -139,23 +116,23 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # ── 9. Summary ───────────────────────────────────────────────
+      # ── 8. Summary ───────────────────────────────────────────────
       - name: Summary
         run: |
           {
-            echo "## Chatbot Deployed ✅"
+            echo "## Java Restaurant Chatbot Deployed ☕"
             echo "**URL**: ${{ steps.deployment.outputs.page_url }}"
             echo "**Trigger**: ${{ github.event_name }}"
             echo "**Run**: #${{ github.run_number }} — $(date -u '+%Y-%m-%d %H:%M UTC')"
             echo ""
-            echo "### Files"
+            echo "### Build output"
             echo "| File | Size |"
             echo "|---|---|"
             echo "| index.html | $(wc -c < _site/index.html) bytes |"
             echo "| chat.js    | $(wc -c < _site/static/js/chat.js) bytes |"
             echo "| chat.css   | $(wc -c < _site/static/css/chat.css) bytes |"
             echo ""
-            echo "### Provider"
+            echo "### Active provider"
             python -c "
           import json, pathlib
           cfg = json.loads(pathlib.Path('_site/config.json').read_text())
